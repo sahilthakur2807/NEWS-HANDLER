@@ -133,6 +133,7 @@ ul.nav-items li a {
     align-items: center;
     gap: 12px;
     flex-wrap: wrap;
+    margin-left: auto;
 }
 
 .control-field {
