@@ -21,9 +21,30 @@
     <h1>Today's News</h1>
     <h2>Stay updated with the latest global headlines</h2>
 
+    <section class="news-container" aria-label="News controls">
+        <div class="news-toolbar">
+            <div class="news-controls">
+                <label class="control-field" for="news-date">
+                    <span class="control-label">Date</span>
+                    <input class="control-input" type="date" id="news-date" name="news-date">
+                </label>
+                <button class="button" type="button" id="load-new-news">Load New News</button>
+                <button class="button" type="button" id="load-favorites">Load Favorites</button>
+            </div>
+        </div>
+    </section>
+
     <section id="bento-gallery" class="bento-gallery" aria-live="polite"></section>
 
+    <section class="favorites-section" aria-label="Favorites">
+        <div class="favorites-header">
+            <h3>Saved Favorites</h3>
+        </div>
+        <div id="favorites-list" class="favorites-list"></div>
+    </section>
+
     <script src="../scripts/config.js"></script>
+    <script src="../scripts/newsManager.js"></script>
     <script src="../scripts/scripts.js"></script>
 </body>
 </html>
