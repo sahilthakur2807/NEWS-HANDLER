@@ -14,6 +14,8 @@
 
     var gallery = document.getElementById('bento-gallery');
     var dateInput = document.getElementById('news-date');
+    var searchInput = document.getElementById('news-search');
+    var searchBtn = document.getElementById('search-news');
     var loadNewBtn = document.getElementById('load-new-news');
     var loadFavoritesBtn = document.getElementById('load-favorites');
     var navLinks = document.querySelectorAll('.nav-items a[data-category]');
@@ -25,6 +27,10 @@
         if (loadNewBtn) {
             loadNewBtn.disabled = isLoading;
             loadNewBtn.textContent = isLoading ? 'Loading...' : 'Load New News';
+        }
+        if (searchBtn) {
+            searchBtn.disabled = isLoading;
+            searchBtn.textContent = isLoading ? 'Searching...' : 'Search';
         }
     }
 
@@ -235,6 +241,33 @@
             });
     }
 
+    function searchNews(query) {
+        if (state.isLoading) return;
+        var trimmed = (query || '').trim();
+        if (!trimmed) {
+            window.alert('Please enter a search term.');
+            return;
+        }
+
+        setLoading(true);
+
+        fetchNews(state.category, pageSize, 'us', { query: trimmed })
+            .then(function(articles) {
+                if (!articles.length) {
+                    renderEmpty('No results found for "' + trimmed + '".');
+                    return;
+                }
+                renderArticles(articles, false);
+            })
+            .catch(function(error) {
+                renderEmpty('Failed to search news.');
+                console.error(error);
+            })
+            .finally(function() {
+                setLoading(false);
+            });
+    }
+
     function loadNewsForDate(dateValue) {
         if (state.isLoading) return;
         if (!dateValue) {
@@ -247,6 +280,7 @@
 
         var page = 1;
         var totalLoaded = 0;
+        var exhausted = false;
 
         function fetchNextPage() {
             return fetchNews(state.category, pageSize, 'us', { date: dateValue, page: page })
@@ -257,6 +291,7 @@
                     }
 
                     if (!articles.length || articles.length < pageSize) {
+                        exhausted = true;
                         return false;
                     }
 
@@ -274,8 +309,9 @@
             .then(function() {
                 if (!totalLoaded) {
                     renderEmpty('No news found for the selected date.');
+                } else if (exhausted) {
+                    showReturnToRecentPrompt();
                 }
-                showReturnToRecentPrompt();
             })
             .catch(function(error) {
                 renderEmpty('Failed to load news for the selected date.');
@@ -289,6 +325,20 @@
     if (loadNewBtn) {
         loadNewBtn.addEventListener('click', function() {
             loadNewsForDate(dateInput ? dateInput.value : '');
+        });
+    }
+
+    if (searchBtn) {
+        searchBtn.addEventListener('click', function() {
+            searchNews(searchInput ? searchInput.value : '');
+        });
+    }
+
+    if (searchInput) {
+        searchInput.addEventListener('keydown', function(event) {
+            if (event.key === 'Enter') {
+                searchNews(searchInput.value);
+            }
         });
     }
 
