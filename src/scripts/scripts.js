@@ -1,125 +1,313 @@
-const API_URL = "https://newsapi.org/v2/top-headlines";
-const FALLBACK_IMAGE =
-	"https://images.unsplash.com/photo-1504711434969-e33886168f5c?auto=format&fit=crop&w=1200&q=80";
-const FALLBACK_DESCRIPTION = "Click to read full news.";
+(function(window, document) {
+    if (!window.newsManager || !window.newsManager.fetchNews) {
+        throw new Error('newsManager.fetchNews is not available.');
+    }
 
-const newsGrid = document.getElementById("bento-gallery");
-const navLinks = document.querySelectorAll(".nav-items a");
+    var fetchNews = window.newsManager.fetchNews;
+    var pageSize = 12;
+    var maxPages = 20;
 
-function escapeText(text) {
-	return (text || "")
-		.replace(/&/g, "&amp;")
-		.replace(/</g, "&lt;")
-		.replace(/>/g, "&gt;")
-		.replace(/\"/g, "&quot;")
-		.trim();
-}
+    var state = {
+        category: 'home',
+        isLoading: false
+    };
 
-function getTileShape(index) {
-	if (index % 6 === 0) return "tile--large";
-	if (index % 3 === 0) return "tile--medium";
-	return "tile--small";
-}
+    var gallery = document.getElementById('bento-gallery');
+    var dateInput = document.getElementById('news-date');
+    var loadNewBtn = document.getElementById('load-new-news');
+    var loadFavoritesBtn = document.getElementById('load-favorites');
+    var navLinks = document.querySelectorAll('.nav-items a[data-category]');
+    var favoritesList = document.getElementById('favorites-list');
+    var favoritesKey = 'newsFavorites';
 
-function createSkeletonCards(totalCards = 8) {
-	const html = [];
+    function setLoading(isLoading) {
+        state.isLoading = isLoading;
+        if (loadNewBtn) {
+            loadNewBtn.disabled = isLoading;
+            loadNewBtn.textContent = isLoading ? 'Loading...' : 'Load New News';
+        }
+    }
 
-	for (let i = 0; i < totalCards; i += 1) {
-		html.push(`
-			<article class="bento-tile ${getTileShape(i)} skeleton-tile" aria-hidden="true">
-				<div class="skeleton-image-block"></div>
-				<div class="skeleton-caption-block">
-					<div class="skeleton-line"></div>
-					<div class="skeleton-line"></div>
-					<div class="skeleton-line short"></div>
-				</div>
-			</article>
-		`);
-	}
+    function clearGallery() {
+        if (gallery) {
+            gallery.innerHTML = '';
+        }
+    }
 
-	return html.join("");
-}
+    function getFavorites() {
+        try {
+            var raw = window.localStorage.getItem(favoritesKey);
+            return raw ? JSON.parse(raw) : [];
+        } catch (error) {
+            return [];
+        }
+    }
 
-function createNewsCard(article, index) {
-	const title = escapeText(article.title) || "Untitled news";
-	const description = escapeText(article.description) || FALLBACK_DESCRIPTION;
-	const image = article.urlToImage || FALLBACK_IMAGE;
-	const url = article.url || "#";
+    function saveFavorites(items) {
+        window.localStorage.setItem(favoritesKey, JSON.stringify(items));
+    }
 
-	return `
-		<article class="bento-tile ${getTileShape(index)} reveal-tile" style="animation-delay:${index * 70}ms">
-			<a class="bento-tile-link" href="${url}" target="_blank" rel="noopener noreferrer">
-				<img src="${image}" alt="${title}" loading="lazy" onerror="this.onerror=null;this.src='${FALLBACK_IMAGE}'" />
-				<div class="tile-caption">
-					<strong>${title}</strong>
-					<span>${description}</span>
-				</div>
-			</a>
-		</article>
-	`;
-}
+    function isFavorite(url) {
+        if (!url) return false;
+        return getFavorites().some(function(item) {
+            return item.url === url;
+        });
+    }
 
-function renderNews(articles) {
-	if (!articles || articles.length === 0) {
-		newsGrid.innerHTML = '<div class="empty-state">No news found.</div>';
-		return;
-	}
+    function addFavorite(article) {
+        if (!article || !article.url) return;
+        var items = getFavorites();
+        if (items.some(function(item) { return item.url === article.url; })) {
+            return;
+        }
+        items.unshift({
+            title: article.title || 'Untitled',
+            url: article.url,
+            source: article.source && article.source.name ? article.source.name : 'Unknown source',
+            description: article.description || ''
+        });
+        saveFavorites(items);
+    }
 
-	const cards = articles.map((article, index) => createNewsCard(article, index));
-	newsGrid.innerHTML = cards.join("");
-}
+    function removeFavorite(url) {
+        if (!url) return;
+        var items = getFavorites().filter(function(item) {
+            return item.url !== url;
+        });
+        saveFavorites(items);
+    }
 
-async function loadNews(category) {
-	const apiKey = window.NEWS_API_KEY;
-	if (!apiKey) {
-		newsGrid.innerHTML = '<div class="empty-state">API key not found in config.js</div>';
-		return;
-	}
+    function renderFavoritesList() {
+        if (!favoritesList) return;
+        favoritesList.innerHTML = '';
 
-	newsGrid.innerHTML = createSkeletonCards(8);
+        var items = getFavorites();
+        if (!items.length) {
+            var empty = document.createElement('p');
+            empty.className = 'empty-state';
+            empty.textContent = 'No favorites saved yet.';
+            favoritesList.appendChild(empty);
+            return;
+        }
 
-	const query = new URLSearchParams({
-		country: "us",
-		pageSize: "12",
-		apiKey,
-	});
+        items.forEach(function(item) {
+            var card = document.createElement('div');
+            card.className = 'favorite-card';
 
-	if (category !== "home") {
-		query.set("category", category);
-	}
+            var content = document.createElement('div');
+            content.className = 'favorite-card-content';
 
-	try {
-		const response = await fetch(`${API_URL}?${query.toString()}`);
-		if (!response.ok) {
-			throw new Error(`Failed with status ${response.status}`);
-		}
+            var link = document.createElement('a');
+            link.href = item.url;
+            link.target = '_blank';
+            link.rel = 'noopener';
+            link.textContent = item.title;
 
-		const data = await response.json();
-		renderNews(data.articles || []);
-	} catch (error) {
-		newsGrid.innerHTML = '<div class="empty-state">Unable to load news right now.</div>';
-	}
-}
+            var meta = document.createElement('p');
+            meta.textContent = item.source;
 
-function setActiveNav(clickedLink) {
-	navLinks.forEach((link) => {
-		const isActive = link === clickedLink;
-		link.classList.toggle("active", isActive);
-	});
-}
+            content.appendChild(link);
+            content.appendChild(meta);
 
-navLinks.forEach((link) => {
-	link.addEventListener("click", (event) => {
-		event.preventDefault();
-		const category = link.dataset.category || "home";
-		setActiveNav(link);
-		loadNews(category);
-	});
-});
+            var actions = document.createElement('div');
+            actions.className = 'favorite-card-actions';
 
-const defaultLink = document.querySelector('.nav-items a[data-category="home"]');
-if (defaultLink) {
-	setActiveNav(defaultLink);
-}
+            var removeBtn = document.createElement('button');
+            removeBtn.type = 'button';
+            removeBtn.className = 'delete-favorite-btn';
+            removeBtn.textContent = 'Remove';
+            removeBtn.addEventListener('click', function() {
+                removeFavorite(item.url);
+                renderFavoritesList();
+            });
 
-loadNews("home");
+            actions.appendChild(removeBtn);
+
+            card.appendChild(content);
+            card.appendChild(actions);
+            favoritesList.appendChild(card);
+        });
+    }
+
+    function renderEmpty(message) {
+        if (!gallery) return;
+        clearGallery();
+        var empty = document.createElement('div');
+        empty.className = 'empty-state';
+        empty.textContent = message;
+        gallery.appendChild(empty);
+    }
+
+    function getTileClass(index) {
+        var mod = index % 6;
+        if (mod === 0) return 'tile--large';
+        if (mod === 3) return 'tile--small';
+        return 'tile--medium';
+    }
+
+    function formatMeta(article) {
+        var source = article.source && article.source.name ? article.source.name : 'Unknown source';
+        var dateText = '';
+        if (article.publishedAt) {
+            var date = new Date(article.publishedAt);
+            if (!isNaN(date.getTime())) {
+                    dateText = ' - ' + date.toLocaleDateString();
+            }
+        }
+        return source + dateText;
+    }
+
+    function renderArticles(articles, append) {
+        if (!gallery) return;
+        if (!append) {
+            clearGallery();
+        }
+
+        var offset = gallery.children.length;
+        articles.forEach(function(article, index) {
+            var tile = document.createElement('article');
+            tile.className = 'bento-tile ' + getTileClass(offset + index);
+
+            var link = document.createElement('a');
+            link.className = 'bento-tile-link';
+            link.href = article.url || '#';
+            link.target = '_blank';
+            link.rel = 'noopener';
+
+            var img = document.createElement('img');
+            img.src = article.urlToImage || 'https://via.placeholder.com/800x600?text=News';
+            img.alt = article.title || 'News image';
+            link.appendChild(img);
+
+            var caption = document.createElement('div');
+            caption.className = 'tile-caption';
+                caption.textContent = (article.title || 'Untitled') + ' - ' + formatMeta(article);
+
+            var actions = document.createElement('div');
+            actions.className = 'tile-actions';
+
+            var favoriteBtn = document.createElement('button');
+            favoriteBtn.type = 'button';
+            favoriteBtn.className = 'favorite-btn';
+            favoriteBtn.textContent = isFavorite(article.url) ? 'Saved' : 'Add to Favorites';
+            favoriteBtn.disabled = isFavorite(article.url);
+            favoriteBtn.addEventListener('click', function() {
+                addFavorite(article);
+                favoriteBtn.textContent = 'Saved';
+                favoriteBtn.disabled = true;
+                renderFavoritesList();
+            });
+
+            actions.appendChild(favoriteBtn);
+
+            tile.appendChild(link);
+            tile.appendChild(caption);
+            tile.appendChild(actions);
+            gallery.appendChild(tile);
+        });
+    }
+
+    function showReturnToRecentPrompt() {
+        var goBack = window.confirm('No more news for this date. Go back to recent news?');
+        if (goBack) {
+            loadRecentNews(state.category);
+        }
+    }
+
+    function loadRecentNews(category) {
+        if (state.isLoading) return;
+        setLoading(true);
+
+        fetchNews(category, pageSize, 'us', { forceRefresh: true })
+            .then(function(articles) {
+                if (!articles.length) {
+                    renderEmpty('No recent news found.');
+                    return;
+                }
+                renderArticles(articles, false);
+            })
+            .catch(function(error) {
+                renderEmpty('Failed to load recent news.');
+                console.error(error);
+            })
+            .finally(function() {
+                setLoading(false);
+            });
+    }
+
+    function loadNewsForDate(dateValue) {
+        if (state.isLoading) return;
+        if (!dateValue) {
+            window.alert('Please select a date first.');
+            return;
+        }
+
+        setLoading(true);
+        clearGallery();
+
+        var page = 1;
+        var totalLoaded = 0;
+
+        function fetchNextPage() {
+            return fetchNews(state.category, pageSize, 'us', { date: dateValue, page: page })
+                .then(function(articles) {
+                    if (articles.length) {
+                        renderArticles(articles, true);
+                        totalLoaded += articles.length;
+                    }
+
+                    if (!articles.length || articles.length < pageSize) {
+                        return false;
+                    }
+
+                    page += 1;
+                    if (page > maxPages) {
+                        window.alert('Reached the maximum number of pages for this date.');
+                        return false;
+                    }
+
+                    return fetchNextPage();
+                });
+        }
+
+        fetchNextPage()
+            .then(function() {
+                if (!totalLoaded) {
+                    renderEmpty('No news found for the selected date.');
+                }
+                showReturnToRecentPrompt();
+            })
+            .catch(function(error) {
+                renderEmpty('Failed to load news for the selected date.');
+                console.error(error);
+            })
+            .finally(function() {
+                setLoading(false);
+            });
+    }
+
+    if (loadNewBtn) {
+        loadNewBtn.addEventListener('click', function() {
+            loadNewsForDate(dateInput ? dateInput.value : '');
+        });
+    }
+
+    if (loadFavoritesBtn) {
+        loadFavoritesBtn.addEventListener('click', function() {
+            renderFavoritesList();
+        });
+    }
+
+    if (navLinks && navLinks.length) {
+        navLinks.forEach(function(link) {
+            link.addEventListener('click', function(event) {
+                event.preventDefault();
+                state.category = link.getAttribute('data-category') || 'home';
+                loadRecentNews(state.category);
+            });
+        });
+    }
+
+    loadRecentNews(state.category);
+    renderFavoritesList();
+})(window, document);
