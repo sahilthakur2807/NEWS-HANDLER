@@ -2,8 +2,9 @@
     var TOP_HEADLINES_API = 'https://newsapi.org/v2/top-headlines';
     var EVERYTHING_API = 'https://newsapi.org/v2/everything';
 
-    function buildTopHeadlinesUrl(category, pageSize, country, page) {
+    function buildTopHeadlinesUrl(category, pageSize, country, page, options) {
         var apiKey = window.NEWS_API_KEY;
+        options = options || {};
         var params = new URLSearchParams({
             apiKey: apiKey,
             country: country || 'us',
@@ -13,6 +14,9 @@
 
         if (category && category !== 'home') {
             params.set('category', category);
+        }
+        if (options.query) {
+            params.set('q', options.query);
         }
 
         return TOP_HEADLINES_API + '?' + params.toString();
@@ -47,7 +51,7 @@
         var hasDateFilter = Boolean(options.date);
         var url = hasDateFilter
             ? buildEverythingUrl(options.query, pageSize, options.date, options.page)
-            : buildTopHeadlinesUrl(category, pageSize, country, options.page);
+            : buildTopHeadlinesUrl(category, pageSize, country, options.page, options);
 
         return fetch(url, {
             signal: options.signal
