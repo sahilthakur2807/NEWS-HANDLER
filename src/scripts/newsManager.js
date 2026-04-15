@@ -3,10 +3,9 @@
     var EVERYTHING_API = 'https://newsapi.org/v2/everything';
 
     function buildTopHeadlinesUrl(category, pageSize, country, page, options) {
-        var apiKey = window.NEWS_API_KEY;
         options = options || {};
         var params = new URLSearchParams({
-            apiKey: apiKey,
+            apiKey: window.NEWS_API_KEY,
             country: country || 'us',
             pageSize: String(pageSize || 16),
             page: String(page || 1)
@@ -23,9 +22,8 @@
     }
 
     function buildEverythingUrl(query, pageSize, selectedDate, page) {
-        var apiKey = window.NEWS_API_KEY;
         var params = new URLSearchParams({
-            apiKey: apiKey,
+            apiKey: window.NEWS_API_KEY,
             q: query || 'news',
             language: 'en',
             sortBy: 'publishedAt',
@@ -53,14 +51,11 @@
             ? buildEverythingUrl(options.query, pageSize, options.date, options.page)
             : buildTopHeadlinesUrl(category, pageSize, country, options.page, options);
 
-        return fetch(url, {
-            signal: options.signal
-        })
+        return fetch(url)
             .then(function (response) {
                 if (!response.ok) {
                     throw new Error('HTTP ' + response.status);
                 }
-
                 return response.json();
             })
             .then(function (data) {
