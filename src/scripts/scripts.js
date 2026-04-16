@@ -6,10 +6,15 @@
     var fetchNews = window.newsManager.fetchNews;
     var pageSize = 12;
     var maxPages = 20;
+    var favoritesKey = 'newsFavorites';
+    var favoritesApiUrl = 'http://localhost:4000/api/favorites';
+    var fallbackImageUrl = '../assets/abstract-globe-background.webp';
 
     var state = {
-        category: 'home',
-        isLoading: false
+        category: 'science',
+        isLoading: false,
+        favorites: [],
+        favoritesLoaded: false
     };
 
     var gallery = document.getElementById('bento-gallery');
@@ -20,13 +25,12 @@
     var loadFavoritesBtn = document.getElementById('load-favorites');
     var navLinks = document.querySelectorAll('.nav-items a[data-category]');
     var favoritesList = document.getElementById('favorites-list');
-    var favoritesKey = 'newsFavorites';
 
     function setLoading(isLoading) {
         state.isLoading = isLoading;
         if (loadNewBtn) {
             loadNewBtn.disabled = isLoading;
-            loadNewBtn.textContent = isLoading ? 'Loading...' : 'Load New News';
+            loadNewBtn.textContent = isLoading ? 'Loading...' : 'Load News';
         }
         if (searchBtn) {
             searchBtn.disabled = isLoading;
@@ -40,7 +44,7 @@
         }
     }
 
-    function getFavorites() {
+    function getLocalFavorites() {
         try {
             var raw = window.localStorage.getItem(favoritesKey);
             return raw ? JSON.parse(raw) : [];
@@ -49,8 +53,67 @@
         }
     }
 
-    function saveFavorites(items) {
+    function saveLocalFavorites(items) {
         window.localStorage.setItem(favoritesKey, JSON.stringify(items));
+    }
+
+    function clearLocalFavorites() {
+        window.localStorage.removeItem(favoritesKey);
+    }
+
+    function setFavorites(items) {
+        state.favorites = Array.isArray(items) ? items : [];
+        state.favoritesLoaded = true;
+    }
+
+    function getFavorites() {
+        return state.favoritesLoaded ? state.favorites : getLocalFavorites();
+    }
+
+    function fetchFavoritesFromApi() {
+        return fetch(favoritesApiUrl).then(function(response) {
+            if (!response.ok) {
+                throw new Error('Failed to load favorites from API');
+            }
+            return response.json();
+        });
+    }
+
+    function saveFavoriteToApi(item) {
+        return fetch(favoritesApiUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(item)
+        }).then(function(response) {
+            if (!response.ok) {
+                throw new Error('Failed to save favorite to API');
+            }
+            return response.json();
+        });
+    }
+
+    function deleteFavoriteFromApi(url) {
+        return fetch(favoritesApiUrl, {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url: url })
+        }).then(function(response) {
+            if (!response.ok) {
+                throw new Error('Failed to delete favorite from API');
+            }
+            return response.json();
+        });
+    }
+
+    function loadFavorites() {
+        return fetchFavoritesFromApi()
+            .then(function(items) {
+                setFavorites(items);
+                clearLocalFavorites();
+            })
+            .catch(function() {
+                setFavorites(getLocalFavorites());
+            });
     }
 
     function isFavorite(url) {
@@ -61,33 +124,58 @@
     }
 
     function addFavorite(article) {
-        if (!article || !article.url) return;
+        if (!article || !article.url) return Promise.resolve();
+
         var items = getFavorites();
-        if (items.some(function(item) { return item.url === article.url; })) {
-            return;
+        if (items.some(function(item) {
+            return item.url === article.url;
+        })) {
+            return Promise.resolve();
         }
-        items.unshift({
+
+        var item = {
             title: article.title || 'Untitled',
             url: article.url,
-            source: article.source && article.source.name ? article.source.name : 'Unknown source',
-            description: article.description || ''
-        });
-        saveFavorites(items);
+            source: article.source && article.source.name ? article.source.name : 'Unknown source'
+        };
+
+        return saveFavoriteToApi(item)
+            .then(function() {
+                items.unshift(item);
+                setFavorites(items);
+                clearLocalFavorites();
+            })
+            .catch(function() {
+                items.unshift(item);
+                setFavorites(items);
+                saveLocalFavorites(items);
+            });
     }
 
     function removeFavorite(url) {
-        if (!url) return;
+        if (!url) return Promise.resolve();
+
         var items = getFavorites().filter(function(item) {
             return item.url !== url;
         });
-        saveFavorites(items);
+
+        return deleteFavoriteFromApi(url)
+            .then(function() {
+                setFavorites(items);
+                clearLocalFavorites();
+            })
+            .catch(function() {
+                setFavorites(items);
+                saveLocalFavorites(items);
+            });
     }
 
     function renderFavoritesList() {
         if (!favoritesList) return;
-        favoritesList.innerHTML = '';
 
+        favoritesList.innerHTML = '';
         var items = getFavorites();
+
         if (!items.length) {
             var empty = document.createElement('p');
             empty.className = 'empty-state';
@@ -123,12 +211,12 @@
             removeBtn.className = 'delete-favorite-btn';
             removeBtn.textContent = 'Remove';
             removeBtn.addEventListener('click', function() {
-                removeFavorite(item.url);
-                renderFavoritesList();
+                removeFavorite(item.url).then(function() {
+                    renderFavoritesList();
+                });
             });
 
             actions.appendChild(removeBtn);
-
             card.appendChild(content);
             card.appendChild(actions);
             favoritesList.appendChild(card);
@@ -137,6 +225,7 @@
 
     function renderEmpty(message) {
         if (!gallery) return;
+
         clearGallery();
         var empty = document.createElement('div');
         empty.className = 'empty-state';
@@ -157,7 +246,7 @@
         if (article.publishedAt) {
             var date = new Date(article.publishedAt);
             if (!isNaN(date.getTime())) {
-                    dateText = ' - ' + date.toLocaleDateString();
+                dateText = ' - ' + date.toLocaleDateString();
             }
         }
         return source + dateText;
@@ -181,13 +270,17 @@
             link.rel = 'noopener';
 
             var img = document.createElement('img');
-            img.src = article.urlToImage || 'https://via.placeholder.com/800x600?text=News';
+            img.src = article.urlToImage || fallbackImageUrl;
             img.alt = article.title || 'News image';
+            img.onerror = function() {
+                img.onerror = null;
+                img.src = fallbackImageUrl;
+            };
             link.appendChild(img);
 
             var caption = document.createElement('div');
             caption.className = 'tile-caption';
-                caption.textContent = (article.title || 'Untitled') + ' - ' + formatMeta(article);
+            caption.textContent = (article.title || 'Untitled') + ' - ' + formatMeta(article);
 
             var actions = document.createElement('div');
             actions.className = 'tile-actions';
@@ -198,14 +291,15 @@
             favoriteBtn.textContent = isFavorite(article.url) ? 'Saved' : 'Add to Favorites';
             favoriteBtn.disabled = isFavorite(article.url);
             favoriteBtn.addEventListener('click', function() {
-                addFavorite(article);
-                favoriteBtn.textContent = 'Saved';
                 favoriteBtn.disabled = true;
-                renderFavoritesList();
+                favoriteBtn.textContent = 'Saving...';
+                addFavorite(article).then(function() {
+                    favoriteBtn.textContent = 'Saved';
+                    renderFavoritesList();
+                });
             });
 
             actions.appendChild(favoriteBtn);
-
             tile.appendChild(link);
             tile.appendChild(caption);
             tile.appendChild(actions);
@@ -214,8 +308,7 @@
     }
 
     function showReturnToRecentPrompt() {
-        var goBack = window.confirm('No more news for this date. Go back to recent news?');
-        if (goBack) {
+        if (window.confirm('No more news for this date. Go back to recent news?')) {
             loadRecentNews(state.category);
         }
     }
@@ -232,9 +325,8 @@
                 }
                 renderArticles(articles, false);
             })
-            .catch(function(error) {
+            .catch(function() {
                 renderEmpty('Failed to load recent news.');
-                console.error(error);
             })
             .finally(function() {
                 setLoading(false);
@@ -243,6 +335,7 @@
 
     function searchNews(query) {
         if (state.isLoading) return;
+
         var trimmed = (query || '').trim();
         if (!trimmed) {
             window.alert('Please enter a search term.');
@@ -259,9 +352,8 @@
                 }
                 renderArticles(articles, false);
             })
-            .catch(function(error) {
+            .catch(function() {
                 renderEmpty('Failed to search news.');
-                console.error(error);
             })
             .finally(function() {
                 setLoading(false);
@@ -283,7 +375,12 @@
         var exhausted = false;
 
         function fetchNextPage() {
-            return fetchNews(state.category, pageSize, 'us', { date: dateValue, page: page })
+            var options = { date: dateValue, page: page };
+            if (state.category && state.category !== 'home') {
+                options.query = state.category;
+            }
+
+            return fetchNews(state.category, pageSize, 'us', options)
                 .then(function(articles) {
                     if (articles.length) {
                         renderArticles(articles, true);
@@ -313,9 +410,8 @@
                     showReturnToRecentPrompt();
                 }
             })
-            .catch(function(error) {
+            .catch(function() {
                 renderEmpty('Failed to load news for the selected date.');
-                console.error(error);
             })
             .finally(function() {
                 setLoading(false);
@@ -344,7 +440,9 @@
 
     if (loadFavoritesBtn) {
         loadFavoritesBtn.addEventListener('click', function() {
-            renderFavoritesList();
+            loadFavorites().then(function() {
+                renderFavoritesList();
+            });
         });
     }
 
@@ -352,12 +450,14 @@
         navLinks.forEach(function(link) {
             link.addEventListener('click', function(event) {
                 event.preventDefault();
-                state.category = link.getAttribute('data-category') || 'home';
+                state.category = link.getAttribute('data-category') || 'science';
                 loadRecentNews(state.category);
             });
         });
     }
 
     loadRecentNews(state.category);
-    renderFavoritesList();
+    loadFavorites().then(function() {
+        renderFavoritesList();
+    });
 })(window, document);

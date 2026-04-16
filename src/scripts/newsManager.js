@@ -3,10 +3,9 @@
     var EVERYTHING_API = 'https://newsapi.org/v2/everything';
 
     function buildTopHeadlinesUrl(category, pageSize, country, page, options) {
-        var apiKey = window.NEWS_API_KEY;
         options = options || {};
         var params = new URLSearchParams({
-            apiKey: apiKey,
+            apiKey: window.NEWS_API_KEY,
             country: country || 'us',
             pageSize: String(pageSize || 16),
             page: String(page || 1)
@@ -15,6 +14,7 @@
         if (category && category !== 'home') {
             params.set('category', category);
         }
+
         if (options.query) {
             params.set('q', options.query);
         }
@@ -23,9 +23,8 @@
     }
 
     function buildEverythingUrl(query, pageSize, selectedDate, page) {
-        var apiKey = window.NEWS_API_KEY;
         var params = new URLSearchParams({
-            apiKey: apiKey,
+            apiKey: window.NEWS_API_KEY,
             q: query || 'news',
             language: 'en',
             sortBy: 'publishedAt',
@@ -48,14 +47,12 @@
             return Promise.reject(new Error('API key not found in config.js'));
         }
 
-        var hasDateFilter = Boolean(options.date);
-        var url = hasDateFilter
-            ? buildEverythingUrl(options.query, pageSize, options.date, options.page)
+        var useEverything = Boolean(options.date);
+        var url = useEverything
+            ? buildEverythingUrl(options.query || category, pageSize, options.date, options.page)
             : buildTopHeadlinesUrl(category, pageSize, country, options.page, options);
 
-        return fetch(url, {
-            signal: options.signal
-        })
+        return fetch(url)
             .then(function (response) {
                 if (!response.ok) {
                     throw new Error('HTTP ' + response.status);
