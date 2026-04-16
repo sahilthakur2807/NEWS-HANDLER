@@ -13,15 +13,33 @@ app.use('/styles', express.static(path.join(__dirname, 'src/styles')));
 app.use('/scripts', express.static(path.join(__dirname, 'src/scripts')));
 app.use('/assets', express.static(path.join(__dirname, 'src/assets')));
 
-const pool = new Pool({
-    host: process.env.PGHOST,
-    port: Number(process.env.PGPORT) || 5432,
-    user: process.env.PGUSER,
-    password: process.env.PGPASSWORD || '',
-    database: process.env.PGDATABASE
-});
+const connectionString = process.env.POSTGRES_URL || process.env.DATABASE_URL;
+const hasLocalDbConfig = Boolean(process.env.PGHOST && process.env.PGUSER && process.env.PGDATABASE);
+const hasDbConfig = Boolean(connectionString || hasLocalDbConfig);
+
+const pool = hasDbConfig
+    ? new Pool(
+        connectionString
+            ? {
+                connectionString: connectionString,
+                ssl: process.env.PGSSL === 'true' ? { rejectUnauthorized: false } : undefined
+            }
+            : {
+                host: process.env.PGHOST,
+                port: Number(process.env.PGPORT) || 5432,
+                user: process.env.PGUSER,
+                password: process.env.PGPASSWORD || '',
+                database: process.env.PGDATABASE,
+                ssl: process.env.PGSSL === 'true' ? { rejectUnauthorized: false } : undefined
+            }
+    )
+    : null;
 
 async function initDatabase() {
+    if (!pool) {
+        return;
+    }
+
     await pool.query(`
         CREATE TABLE IF NOT EXISTS favorites (
             id SERIAL PRIMARY KEY,
@@ -99,6 +117,10 @@ app.get('/api/health', function(req, res) {
 });
 
 app.get('/api/favorites', async function(req, res) {
+    if (!pool) {
+        return res.status(500).json({ error: 'Database is not configured' });
+    }
+
     try {
         const result = await pool.query('SELECT title, url, source FROM favorites ORDER BY created_at DESC');
         res.json(result.rows);
@@ -108,6 +130,10 @@ app.get('/api/favorites', async function(req, res) {
 });
 
 app.post('/api/favorites', async function(req, res) {
+    if (!pool) {
+        return res.status(500).json({ error: 'Database is not configured' });
+    }
+
     const title = req.body.title || 'Untitled';
     const url = req.body.url;
     const source = req.body.source || 'Unknown source';
@@ -128,6 +154,10 @@ app.post('/api/favorites', async function(req, res) {
 });
 
 app.delete('/api/favorites', async function(req, res) {
+    if (!pool) {
+        return res.status(500).json({ error: 'Database is not configured' });
+    }
+
     const url = req.body.url;
 
     if (!url) {
@@ -150,5 +180,13 @@ initDatabase()
     })
     .catch(function(error) {
         console.error('Database initialization failed:', error);
+
+        if (process.env.VERCEL) {
+            app.listen(port, function() {
+                console.log('Server running on http://localhost:' + port);
+            });
+            return;
+        }
+
         process.exit(1);
     });
