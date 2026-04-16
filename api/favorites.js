@@ -1,13 +1,20 @@
 const { Pool } = require('pg');
 
-const pool = new Pool({
-    host: process.env.PGHOST,
-    port: Number(process.env.PGPORT) || 5432,
-    user: process.env.PGUSER,
-    password: process.env.PGPASSWORD || '',
-    database: process.env.PGDATABASE,
-    ssl: process.env.PGSSL === 'true' ? { rejectUnauthorized: false } : undefined
-});
+const connectionString = process.env.POSTGRES_URL || process.env.DATABASE_URL;
+
+const pool = connectionString
+    ? new Pool({
+        connectionString: connectionString,
+        ssl: { rejectUnauthorized: false }
+    })
+    : new Pool({
+        host: process.env.PGHOST,
+        port: Number(process.env.PGPORT) || 5432,
+        user: process.env.PGUSER,
+        password: process.env.PGPASSWORD || '',
+        database: process.env.PGDATABASE,
+        ssl: process.env.PGSSL === 'true' ? { rejectUnauthorized: false } : undefined
+    });
 
 let initialized = false;
 
