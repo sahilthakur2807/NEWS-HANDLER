@@ -7,8 +7,8 @@
     var pageSize = 12;
     var maxPages = 20;
     var favoritesKey = 'newsFavorites';
-    var favoritesApiUrl = 'http://localhost:4000/api/favorites';
-    var fallbackImageUrl = '../assets/abstract-globe-background.webp';
+    var favoritesApiUrl = '/api/favorites';
+    var fallbackImageUrl = '/assets/abstract-globe-background.webp';
 
     var state = {
         category: 'science',

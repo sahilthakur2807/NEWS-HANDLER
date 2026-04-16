@@ -1,0 +1,9 @@
+{
+    "version": 2,
+    "rewrites": [
+        { "source": "/", "destination": "/src/pages/index.html" },
+        { "source": "/styles/:path*", "destination": "/src/styles/:path*" },
+        { "source": "/scripts/:path*", "destination": "/src/scripts/:path*" },
+        { "source": "/assets/:path*", "destination": "/src/assets/:path*" }
+    ]
+}
