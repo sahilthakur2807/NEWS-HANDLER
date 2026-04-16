@@ -1,56 +1,27 @@
 (function () {
-    var TOP_HEADLINES_API = 'https://newsapi.org/v2/top-headlines';
-    var EVERYTHING_API = 'https://newsapi.org/v2/everything';
-
-    function buildTopHeadlinesUrl(category, pageSize, country, page, options) {
+    function buildNewsApiUrl(category, pageSize, country, options) {
         options = options || {};
         var params = new URLSearchParams({
-            apiKey: window.NEWS_API_KEY,
-            country: country || 'us',
+            category: category || 'science',
             pageSize: String(pageSize || 16),
-            page: String(page || 1)
+            country: country || 'us',
+            page: String(options.page || 1)
         });
-
-        if (category && category !== 'home') {
-            params.set('category', category);
-        }
 
         if (options.query) {
-            params.set('q', options.query);
+            params.set('query', options.query);
         }
 
-        return TOP_HEADLINES_API + '?' + params.toString();
-    }
-
-    function buildEverythingUrl(query, pageSize, selectedDate, page) {
-        var params = new URLSearchParams({
-            apiKey: window.NEWS_API_KEY,
-            q: query || 'news',
-            language: 'en',
-            sortBy: 'publishedAt',
-            pageSize: String(pageSize || 16),
-            page: String(page || 1)
-        });
-
-        if (selectedDate) {
-            params.set('from', selectedDate);
-            params.set('to', selectedDate);
+        if (options.date) {
+            params.set('date', options.date);
         }
 
-        return EVERYTHING_API + '?' + params.toString();
+        return '/api/news?' + params.toString();
     }
 
     function fetchNews(category, pageSize, country, options) {
         options = options || {};
-
-        if (!window.NEWS_API_KEY) {
-            return Promise.reject(new Error('API key not found in config.js'));
-        }
-
-        var useEverything = Boolean(options.date);
-        var url = useEverything
-            ? buildEverythingUrl(options.query || category, pageSize, options.date, options.page)
-            : buildTopHeadlinesUrl(category, pageSize, country, options.page, options);
+        var url = buildNewsApiUrl(category, pageSize, country, options);
 
         return fetch(url)
             .then(function (response) {
