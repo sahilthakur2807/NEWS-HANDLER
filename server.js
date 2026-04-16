@@ -2,12 +2,16 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const { Pool } = require('pg');
+const path = require('path');
 
 const app = express();
 const port = process.env.PORT || 4000;
 
 app.use(cors());
 app.use(express.json());
+app.use('/styles', express.static(path.join(__dirname, 'src/styles')));
+app.use('/scripts', express.static(path.join(__dirname, 'src/scripts')));
+app.use('/assets', express.static(path.join(__dirname, 'src/assets')));
 
 const pool = new Pool({
     host: process.env.PGHOST,
@@ -30,7 +34,64 @@ async function initDatabase() {
 }
 
 app.get('/', function(req, res) {
-    res.json({ ok: true, endpoints: ['/api/health', '/api/favorites'] });
+    res.sendFile(path.join(__dirname, 'src/pages/index.html'));
+});
+
+app.get('/api/news', async function(req, res) {
+    const apiKey = process.env.NEWS_API_KEY;
+
+    if (!apiKey) {
+        return res.status(500).json({ error: 'NEWS_API_KEY is not configured' });
+    }
+
+    try {
+        const category = req.query.category || 'science';
+        const country = req.query.country || 'us';
+        const pageSize = Number(req.query.pageSize) || 12;
+        const page = Number(req.query.page) || 1;
+        const searchQuery = req.query.query;
+        const date = req.query.date;
+
+        const params = new URLSearchParams({
+            apiKey: apiKey,
+            pageSize: String(pageSize),
+            page: String(page)
+        });
+
+        let endpoint = 'https://newsapi.org/v2/top-headlines';
+
+        if (date) {
+            endpoint = 'https://newsapi.org/v2/everything';
+            params.set('q', searchQuery || category || 'news');
+            params.set('language', 'en');
+            params.set('sortBy', 'publishedAt');
+            params.set('from', date);
+            params.set('to', date);
+        } else {
+            params.set('country', country);
+            if (category && category !== 'home') {
+                params.set('category', category);
+            }
+            if (searchQuery) {
+                params.set('q', searchQuery);
+            }
+        }
+
+        const response = await fetch(endpoint + '?' + params.toString());
+        const data = await response.json();
+
+        if (!response.ok) {
+            return res.status(response.status).json({
+                error: data && data.message ? data.message : 'Failed to fetch news'
+            });
+        }
+
+        return res.status(200).json({
+            articles: Array.isArray(data.articles) ? data.articles : []
+        });
+    } catch (error) {
+        return res.status(500).json({ error: 'News API request failed' });
+    }
 });
 
 app.get('/api/health', function(req, res) {
