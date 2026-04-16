@@ -3,22 +3,48 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
+    <title>News App</title>
     <link rel="stylesheet" href="../styles/styles.css">
 </head>
 <body>
-    <nav class="navbar">
-        <ul class="nav-items">
-            <li><a href="#" data-category="home">Home</a></li>
-            <li><a href="#" data-category="general">World</a></li>
-            <li><a href="#" data-category="general">Politics</a></li>
-            <li><a href="#" data-category="business">Business</a></li>
-            <li><a href="#" data-category="technology">Technology</a></li>
-            <li><a href="#" data-category="sports">Sports</a></li>
-            <li><a href="#" data-category="entertainment">Entertainment</a></li>
-        </ul>
-    </nav>
+    <header class="topbar">
+        <nav class="navbar" aria-label="News categories">
+            <ul class="nav-items">
+                <li><a href="#" data-category="science">Science</a></li>
+                <li><a href="#" data-category="health">Health</a></li>
+                <li><a href="#" data-category="business">Business</a></li>
+                <li><a href="#" data-category="technology">Technology</a></li>
+                <li><a href="#" data-category="sports">Sports</a></li>
+                <li><a href="#" data-category="entertainment">Entertainment</a></li>
+            </ul>
+        </nav>
     <h1>Today's News</h1>
-    <h2>Stay Updated with the most recent updates</h2>
+    <h2>Stay updated with the latest global headlines</h2>
+    </header>
+
+    <main class="page-shell">
+        <section class="news-controls" aria-label="News controls">
+            <div class="search-controls">
+                <input type="search" id="news-search" placeholder="Search news">
+                <button type="button" id="search-news">Search</button>
+            </div>
+
+            <div class="date-controls">
+                <input type="date" id="news-date">
+                <button type="button" id="load-new-news">Load News</button>
+                <button type="button" id="load-favorites">Load Favorites</button>
+            </div>
+        </section>
+
+        <section id="bento-gallery" class="bento-gallery" aria-live="polite"></section>
+
+        <section class="favorites-section" aria-label="Saved favorites">
+            <h2>Saved Favorites</h2>
+            <div id="favorites-list" class="favorites-list"></div>
+        </section>
+    </main>
+
+    <script src="../scripts/newsManager.js"></script>
+    <script src="../scripts/scripts.js"></script>
 </body>
 </html>
