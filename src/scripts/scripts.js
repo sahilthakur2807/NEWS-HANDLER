@@ -8,6 +8,7 @@
     var maxPages = 20;
     var favoritesKey = 'newsFavorites';
     var favoritesApiUrl = 'http://localhost:4000/api/favorites';
+    var fallbackImageUrl = '../assets/abstract-globe-background.webp';
 
     var state = {
         category: 'science',
@@ -269,8 +270,12 @@
             link.rel = 'noopener';
 
             var img = document.createElement('img');
-            img.src = article.urlToImage || 'https://via.placeholder.com/800x600?text=News';
+            img.src = article.urlToImage || fallbackImageUrl;
             img.alt = article.title || 'News image';
+            img.onerror = function() {
+                img.onerror = null;
+                img.src = fallbackImageUrl;
+            };
             link.appendChild(img);
 
             var caption = document.createElement('div');
