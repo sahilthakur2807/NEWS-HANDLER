@@ -325,8 +325,9 @@
                 }
                 renderArticles(articles, false);
             })
-            .catch(function() {
-                renderEmpty('Failed to load recent news.');
+            .catch(function(error) {
+                var reason = error && error.message ? ' (' + error.message + ')' : '';
+                renderEmpty('Failed to load recent news.' + reason);
             })
             .finally(function() {
                 setLoading(false);
@@ -406,8 +407,6 @@
             .then(function() {
                 if (!totalLoaded) {
                     renderEmpty('No news found for the selected date.');
-                } else if (exhausted) {
-                    showReturnToRecentPrompt();
                 }
             })
             .catch(function() {

@@ -26,7 +26,13 @@
         return fetch(url)
             .then(function (response) {
                 if (!response.ok) {
-                    throw new Error('HTTP ' + response.status);
+                    return response.json()
+                        .catch(function () {
+                            return {};
+                        })
+                        .then(function (payload) {
+                            throw new Error(payload.error || ('HTTP ' + response.status));
+                        });
                 }
 
                 return response.json();
